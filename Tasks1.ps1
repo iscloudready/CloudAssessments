@@ -4,7 +4,6 @@ $project = ""
 $repositoryName = ""
 $repositoryId = ""
 $method = "GET"
-$AdminUser = ""
 $orgUrl = "https://dev.azure.com/$organization"
 $url = "$orgUrl/$project/_apis/git/repositories/$repositoryId/commits?"
 $queryString = "api-version=6.0"
@@ -12,7 +11,7 @@ $patToken = ""
 $contentType = "application/json"
 $basePath = "C:\\"
 $Path = $basePath + "$project"
-$networkPath = "\\Share"
+$networkPath = "\\Share" 
 #endregion System Variables
 
 #region Application settings
@@ -22,7 +21,7 @@ $toDate = "6/12/2017 12:00:00 AM"
 $fromCommitId = "55b7d182e38aec0cf0579793c05c5f0cc4eab098" 
 $toCommitId = "59381fd6911877566ca37acd87c03b73fe073c27" 
 
-$filteredRangeFilePath = "C:\Users\Pradeep\Downloads\Logs\filteredRange.json"
+$filteredRangeFilePath = "$basePath\filteredRange.json"
 #endregion Application settings
 
 #region validation checks
@@ -107,54 +106,17 @@ function InvokeGetRequest ($URL, $contentType) {
 }
 #endregion Process Request
 
-#region Get all projects
-# Get the list of all projects in the organization
-$projectsUrl = "$orgUrl/_apis/projects?$queryString"
-$projects = InvokeGetRequest $projectsUrl $contentType
-$projects.value | ForEach-Object {
-    #Write-Host $_.id $_.name
-}
-#endregion Get all projects
-
 #region Retrieve filtered results
-$dateRangeFilterUrl = CreateDateRangeFilterUrl -URL $url -fromDate $fromDate -toDate $toDate
-$commitIdRangeFilterUrl = CreateCommitIdRangeFilter -URL $url -fromCommitId $fromCommitId -toCommitId $toCommitId
-# Result is populated in browser with the above url
-InvokeGetRequest $dateRangeFilterUrl
-$filteredRange = InvokeGetRequest $commitIdRangeFilterUrl $contentType
-Write-Host "Total filtered results received from the commit range from $fromCommitId to $toCommitId are $($filteredRange.count)"
-$filteredRange | ConvertTo-Json | Out-File $filteredRangeFilePath
-#endregion Retrieve filtered results
 
 # result processing
-$commitIds = [System.Collections.ArrayList]@()
-foreach ($id in $filteredRange.value) {
-    $commitIds.Add($id.commitId)
-}
-
-$filePaths = [System.Collections.ArrayList]@()
-foreach ($commitId in $commitIds) {
-    $newUrl = "$($orgUrl)/$project/_apis/git/repositories/$repositoryId/commits/$commitId/changes?$queryString"
-    $filteredCommitData = InvokeGetRequest $newUrl $contentType
-
-    foreach ($item in $filteredCommitData.changes) {
-        $filePaths.Add($item.item.path)
-    }
-}
-
 # Construct the download URL
 function DownloadContents($filePath) {
     $url = "$($orgUrl)/$project/_apis/git/repositories/$repositoryName/items?path=$filePath&download=true&$queryString"
     $contentType = "application/text"
-    #Write-Host "Download the contents from $url to $filePath"
 
     $loc = "$Path/$filePath"
-    #$getOnlyDirectory = [io.path]::GetDirectoryName($loc) #(Split-Path -parent $loc)
     if ([string]::IsNullOrEmpty([IO.Path]::GetExtension((Split-Path $loc -leaf)))) {
         createDirectory $loc
-        Write-Host "loc: $loc"
-        #$createLoc = Convert-Path($loc)
-        #Write-Host "createLoc: $createLoc"
     }
 
     Write-Host "Downloading contents from $url to $loc"
@@ -163,11 +125,46 @@ function DownloadContents($filePath) {
     }
 }
 
-foreach ($filePath in $filePaths) {
-    #Write-Host "Download the contents from path $filePath"
-    DownloadContents -filePath $filePath
-    Start-Sleep 1
+function RetrieveFilteredResults() {
+    $dateRangeFilterUrl = CreateDateRangeFilterUrl -URL $url -fromDate $fromDate -toDate $toDate
+    $commitIdRangeFilterUrl = CreateCommitIdRangeFilter -URL $url -fromCommitId $fromCommitId -toCommitId $toCommitId
+    # Result is populated in browser with the above url
+    InvokeGetRequest $dateRangeFilterUrl
+    $filteredRange = InvokeGetRequest $commitIdRangeFilterUrl $contentType
+    Write-Host "Total filtered results received from the commit range from $fromCommitId to $toCommitId are $($filteredRange.count)"
+    $filteredRange | ConvertTo-Json | Out-File $filteredRangeFilePath
+
+    $commitIds = [System.Collections.ArrayList]@()
+    foreach ($id in $filteredRange.value) {
+        $commitIds.Add($id.commitId)
+    }
+
+    $filePaths = [System.Collections.ArrayList]@()
+    foreach ($commitId in $commitIds) {
+        $newUrl = "$($orgUrl)/$project/_apis/git/repositories/$repositoryId/commits/$commitId/changes?$queryString"
+        $filteredCommitData = InvokeGetRequest $newUrl $contentType
+
+        foreach ($item in $filteredCommitData.changes) {
+            $filePaths.Add($item.item.path)
+        }
+    }
+
+    foreach ($filePath in $filePaths) {
+        DownloadContents -filePath $filePath
+        Start-Sleep 1
+    }
 }
+
+#endregion Retrieve filtered results
+
+# Export-ModuleMember -Function * -Alias * 
+
+# ====================
+# Notes - How to use
+# ====================
+#. Configure the system vaiables and Application variables before running the code
+# 1.    Find and download only changed source files between 2 points in history of given git branch
+RetrieveFilteredResults
 
 # 2.    Form .zip with those files (including path)
 CleanUp "$basePath\$project.zip"
