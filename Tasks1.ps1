@@ -10,18 +10,19 @@ $url = "$orgUrl/$project/_apis/git/repositories/$repositoryId/commits?"
 $queryString = "api-version=6.0"
 $patToken = ""
 $contentType = "application/json"
-$Path = "C:\\" + "\$project"
-$networkPath = "\\" 
+$basePath = "C:\\"
+$Path = $basePath + "$project"
+$networkPath = "\\Share"
 #endregion System Variables
 
 #region Application settings
-$fromDate = "6/11/2017 12:00:00 AM" #"29-7-2022"
-$toDate = "6/12/2017 12:00:00 AM" #"29-5-2022" # Get-Date -Format d
+$fromDate = "6/11/2017 12:00:00 AM" 
+$toDate = "6/12/2017 12:00:00 AM" 
 
 $fromCommitId = "55b7d182e38aec0cf0579793c05c5f0cc4eab098" 
 $toCommitId = "59381fd6911877566ca37acd87c03b73fe073c27" 
 
-$filteredRangeFilePath = "$Path\filteredRange.json"
+$filteredRangeFilePath = "C:\Users\Pradeep\Downloads\Logs\filteredRange.json"
 #endregion Application settings
 
 #region validation checks
@@ -37,6 +38,13 @@ function createDirectory($path) {
     }
     catch {}
 }
+
+function CleanUp($path) {
+    if (Test-Path $path) {
+        Remove-Item $path -Force -ErrorAction SilentlyContinue
+    }
+}
+
 createDirectory $path
 #endregion validation checks
 
@@ -160,3 +168,11 @@ foreach ($filePath in $filePaths) {
     DownloadContents -filePath $filePath
     Start-Sleep 1
 }
+
+# 2.    Form .zip with those files (including path)
+CleanUp "$basePath\$project.zip"
+Compress-Archive -LiteralPath $Path -DestinationPath $Path 
+
+# 3.    Upload .zip to network share
+CleanUp "$networkPath\$project.zip"
+Copy-Item "$basePath\$project.zip" $networkPath
