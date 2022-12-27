@@ -35,7 +35,12 @@ $Header = @{
 #endregion Authorization
 
 #region Request Processing
-function CreateDateRangeFilterUrl($URL, $fromDate, $toDate) {
+function CreateDateRangeFilterUrl {
+    param(
+        [Parameter (Mandatory = $true)] [String]$URL,
+        [Parameter (Mandatory = $true)] [String]$fromDate,
+        [Parameter (Mandatory = $true)] [String]$toDate
+    )
     if ([string]::IsNullOrEmpty($URL) -or [string]::IsNullOrEmpty($fromDate) -or [string]::IsNullOrEmpty($toDate)) {
         return
     }
