@@ -10,7 +10,7 @@ $queryString = "api-version=6.0"
 $patToken = ""
 $contentType = "application/json"
 $basePath = "C:\\"
-$Path = $basePath + "$project"
+$Path = "$basePath$project"
 $networkPath = "\\Share" 
 #endregion System Variables
 
@@ -24,29 +24,6 @@ $toCommitId = "59381fd6911877566ca37acd87c03b73fe073c27"
 $filteredRangeFilePath = "$basePath\filteredRange.json"
 #endregion Application settings
 
-#region validation checks
-function createDirectory($path) {
-    try {
-        If (!(Test-Path -PathType container $path)) {
-            New-Item -ItemType Directory -Path $path
-            Write-Host "Folder path has been created successfully at: " $path
-        }
-        else {
-            Write-Host "The given folder path $path already exists";
-        }
-    }
-    catch {}
-}
-
-function CleanUp($path) {
-    if (Test-Path $path) {
-        Remove-Item $path -Force -ErrorAction SilentlyContinue
-    }
-}
-
-createDirectory $path
-#endregion validation checks
-
 #region Authorization
 # Define organization base url, PAT and API version variables
 # Create header with PAT The Header is created with the given information.
@@ -58,13 +35,12 @@ $Header = @{
 #endregion Authorization
 
 #region Request Processing
-# 1. Find and download only changed source files between 2 points in history of given git branch
 function CreateDateRangeFilterUrl($URL, $fromDate, $toDate) {
-    if (![string]::IsNullOrEmpty($URL)) {
-        if (!([string]::IsNullOrEmpty($fromDate)) -and !([string]::IsNullOrEmpty($toDate))) {
-            $formattedUrl = "$($URL)searchCriteria.fromDate=$($fromDate)&searchCriteria.toDate=$($toDate)&$($queryString)"
-        }
-    }  
+    if ([string]::IsNullOrEmpty($URL) -or [string]::IsNullOrEmpty($fromDate) -or [string]::IsNullOrEmpty($toDate)) {
+        return
+    }
+
+    $formattedUrl = "$($URL)searchCriteria.fromDate=$($fromDate)&searchCriteria.toDate=$($toDate)&$($queryString)"
     Write-Host "Date Range filtered url $($formattedUrl)"
     return $formattedUrl  
 }
@@ -75,11 +51,11 @@ function CreateCommitIdRangeFilter {
         [Parameter (Mandatory = $true)] [String]$fromCommitId,
         [Parameter (Mandatory = $true)] [String]$toCommitId
     )
-    if (![string]::IsNullOrEmpty($URL)) {
-        if (!([string]::IsNullOrEmpty($fromCommitId)) -and !([string]::IsNullOrEmpty($toCommitId))) {
-            $formattedUrl = "$($URL)searchCriteria.fromCommitId=$($fromCommitId)&searchCriteria.toCommitId=$($toCommitId)&$($queryString)"
-        }
+    if ([string]::IsNullOrEmpty($URL) -or [string]::IsNullOrEmpty($fromCommitId) -or [string]::IsNullOrEmpty($toCommitId)) {
+        return
     }
+
+    $formattedUrl = "$($URL)searchCriteria.fromCommitId=$($fromCommitId)&searchCriteria.toCommitId=$($toCommitId)&$($queryString)"
     Write-Host "Commit Id Range filtered url $($formattedUrl)"
     return $formattedUrl    
 }
@@ -96,12 +72,8 @@ function InvokeGetRequest ($URL, $contentType) {
         return $response   
     }
     catch {
-        if ($_.ErrorDetails.Message) {
-            Write-Host $_.ErrorDetails.Message
-        }
-        else {
-            Write-Host $_
-        }
+        Write-Host $_.ErrorDetails.Message -ErrorAction SilentlyContinue
+        Write-Host $_ -ErrorAction SilentlyContinue
     }
 }
 #endregion Process Request
@@ -155,21 +127,3 @@ function RetrieveFilteredResults() {
     }
 }
 
-#endregion Retrieve filtered results
-
-# Export-ModuleMember -Function * -Alias * 
-
-# ====================
-# Notes - How to use
-# ====================
-#. Configure the system vaiables and Application variables before running the code
-# 1.    Find and download only changed source files between 2 points in history of given git branch
-RetrieveFilteredResults
-
-# 2.    Form .zip with those files (including path)
-CleanUp "$basePath\$project.zip"
-Compress-Archive -LiteralPath $Path -DestinationPath $Path 
-
-# 3.    Upload .zip to network share
-CleanUp "$networkPath\$project.zip"
-Copy-Item "$basePath\$project.zip" $networkPath
