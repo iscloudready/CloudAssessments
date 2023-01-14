@@ -1,4 +1,4 @@
-# CloudAssessments
+# Powershell script uses TFS REST API to find and download changed source files between two points in history of a given Git branch
 This script is written in PowerShell and it uses the TFS REST API to find and download changed source files between two points in history of a given Git branch. The script uses the **Invoke-RestMethod** command to make a GET request to the TFS REST API endpoint to retrieve a list of commits that fall within a specified date range or commit ID range. The script then uses the commit details to construct URLs to download the changed files.
 
 The script uses two functions **CreateDateRangeFilterUrl** and **CreateCommitIdRangeFilter** to create the url for GET request that filter the commits based on date range and commit id range respectively.
